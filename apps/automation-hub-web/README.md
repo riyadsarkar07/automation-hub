@@ -75,7 +75,7 @@ are NOT stored in public frontend variables.
 2. Set `TELEGRAM_BOT_TOKEN` and the **same** `TELEGRAM_WEBHOOK_SECRET` under
    Supabase → Edge Functions → Secrets (the platform provides the
    `SUPABASE_URL` and `SUPABASE_SERVICE_ROLE_KEY` Edge secrets).
-3. Register this **public** webhook URL with Telegram's `setWebhook` Bot API:
+3. Register this **public** webhook URL with Telegram's `setWebhook` Bot API. After filling a local ignored `.env.local`, run `node --env-file=.env.local scripts/register-telegram-webhook.mjs` (Node.js 22+). This script first checks that the token belongs to `@automated_hub_bot` and never prints the token:
    `https://lgcxykpoufenqcfbmdtw.supabase.co/functions/v1/automation-hub-telegram-webhook`
    Set `secret_token` to `TELEGRAM_WEBHOOK_SECRET` and
    `allowed_updates` to `["message"]`. Keep the bot token out of logs,
