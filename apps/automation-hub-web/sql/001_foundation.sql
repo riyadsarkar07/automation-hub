@@ -71,9 +71,14 @@ create policy "ah_runs_read_owner" on public.automation_runs for select to authe
 create policy "ah_events_read_owner" on public.automation_hub_events for select to authenticated
   using (exists(select 1 from public.automation_hub_organizations o where o.id=organization_id and o.owner_user_id=(select auth.uid())));
 
--- Privileged routine handles one atomic, idempotent in-app notification.
--- Search path and EXECUTE privileges are deliberately narrowed.
-create or replace function public.ah_run_in_app_notice(p_automation_id uuid, p_idempotency_key uuid)
+-- Keep the privileged routine in a private, non-API-exposed schema.
+-- The public RPC is SECURITY INVOKER and delegates to the owner-checking routine.
+-- Ensure Supabase Data API exposed schemas do NOT include automation_hub_private.
+create schema if not exists automation_hub_private;
+revoke all on schema automation_hub_private from public, anon;
+grant usage on schema automation_hub_private to authenticated;
+
+create or replace function automation_hub_private.ah_run_in_app_notice_internal(p_automation_id uuid, p_idempotency_key uuid)
 returns uuid language plpgsql security definer set search_path = '' as $$
 declare a record; existing_run_id uuid; new_run_id uuid;
 begin
@@ -100,5 +105,13 @@ begin
   return new_run_id;
 end;
 $$;
-revoke all on function public.ah_run_in_app_notice(uuid,uuid) from public,anon;
+revoke all on function automation_hub_private.ah_run_in_app_notice_internal(uuid,uuid) from public, anon;
+grant execute on function automation_hub_private.ah_run_in_app_notice_internal(uuid,uuid) to authenticated;
+
+-- Only this invoker-rights wrapper is callable through the public Data API.
+create or replace function public.ah_run_in_app_notice(p_automation_id uuid, p_idempotency_key uuid)
+returns uuid language sql security invoker set search_path = '' as $
+  select automation_hub_private.ah_run_in_app_notice_internal(p_automation_id, p_idempotency_key);
+$;
+revoke all on function public.ah_run_in_app_notice(uuid,uuid) from public, anon;
 grant execute on function public.ah_run_in_app_notice(uuid,uuid) to authenticated;
