@@ -1,5 +1,5 @@
 import { redirect } from 'next/navigation';
-import { serverClient } from '@/lib/supabase';
+import { serverClient } from '@/lib/supabase/server';
 import { SignOut } from './sign-out';
 import { WorkspaceActions } from './workspace-actions';
 export const dynamic = 'force-dynamic';
