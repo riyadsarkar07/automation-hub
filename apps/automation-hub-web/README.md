@@ -1,39 +1,45 @@
-# Automation Hub Web — foundation
+# Automation Hub Web — internal automation MVP
 
-An isolated **Next.js 16** customer-facing application alongside (not inside) the n8n editor. This is **not yet a working automation engine**.
+A customer-facing Next.js 16 application alongside the upstream n8n source.
+The internal notification MVP does **not** host or embed n8n and is **not** a general-purpose background automation engine.
 
-## Local setup
+## Current deployment (2026-11-17)
 
-1. Open this directory directly (`cd apps/automation-hub-web`). This directory is deliberately **not** included in the root pnpm workspace.
-2. Run `npm install` to generate a lockfile and install dependencies, then `npm run dev`.
-3. Copy `.env.example` to `.env.local` and configure `NEXT_PUBLIC_SUPABASE_URL` and `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` from your own Supabase project. Configure email auth and the app's allowed redirect URLs in Supabase.
-4. Visit `/login`. Email/password sign-in and sign-up are wired to Supabase. The dashboard verifies the account on the server.
+- Dedicated Supabase project: `automation ai` (`lgcxykpoufenqcfbmdtw`, organization `Automation Ai`).
+- Applied database migrations: `automation_hub_foundation` and `automation_hub_events_automation_index`.
+- Four application tables have RLS enabled, and seven ownership policies are installed.
+- Structural SQL permission test (`sql/002_rls_smoke.sql`): **PASS**.
+- Transactional SQL isolation test with two *simulated* authenticated identities: **PASS**. This covered tenant isolation, forbidden cross-user insert/update/RPC, anonymous RPC denial, idempotency, paused state and run/event access. Temporary rows were rolled back.
+- Supabase security advisors: **no security lints** at the time of verification. Unused-index informational notices are expected on empty tables.
+- Vercel project: `automation-hub-web`, **Preview** environment variables configured (URL and modern publishable key, no service-role key).
+- A Supabase-connected Vercel Preview deployment was built and returned HTTP 200 for `/` and `/login`. Unauthenticated `/dashboard` serves the login route.
+- **Not production approved**: two genuine Auth users, email confirmation and browser workflow E2E are unverified. Production env/deployment have not been switched to the new backend.
 
-## Vercel
+## Local development
 
-Set **Root Directory** to `apps/automation-hub-web` and add the same public environment variables in Vercel. The entire n8n backend is **not** deployed by this Vercel project.
+1. `cd apps/automation-hub-web` (this app is intentionally outside the n8n pnpm workspace).
+2. `npm install` and `npm run dev`.
+3. Copy `.env.example` to `.env.local`. Fill `NEXT_PUBLIC_SUPABASE_URL` and `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` from the intended Supabase project; **never commit secrets or service role keys**.
+4. Set Supabase Authentication → URL Configuration → Site URL and allowed redirect URLs for the exact development and deployment origins.
+5. Open `/login` and test signup, confirmation, workspace creation, notification automation, Run now, and private activity.
 
-## State and limitations
+## Database migrations
 
-- Implemented: original responsive marketing page, login/signup UI, Supabase SSR cookie integration, protected read-only dashboard shell, empty/error states, sign out.
-- Not implemented: organization selection/onboarding, SQL migrations, RLS policy tests, automations creation/dispatch, live run history, provider OAuth, payments, billing, deployment, automated tests.
-- The dashboard will show a database configuration warning until a reviewed tenant-safe schema is deployed. Do not create a permissive `automation_instances` table to silence that message.
-- Do not treat an authenticated session as authorization to access another tenant's data. Ensure RLS policies are verified before activating the table.
-- Do not provide n8n as an unlicensed hosted or white-label service.
-- Install dependencies and commit the generated lockfile before production deployment. Package versions are preliminary, not validated by a local build in this PR.
+- `sql/001_foundation.sql`: four owner-scoped RLS tables, restricted grants, and an invoker-rights public RPC delegating to a private owner-checking execution routine.
+- `sql/002_rls_smoke.sql`: structural RLS/grants smoke assertions; **this is a test, not a migration**.
+- `sql/003_events_automation_index.sql`: covering index on event `automation_id` foreign key.
+- The `automation_hub_private` schema must not be added to the Supabase Data API exposed schemas.
+- Before production, run real two-user Supabase Auth + Data API negative isolation tests and E2E tests under ordinary signed-in sessions, without a privileged service-role client.
 
-## Owner-scoped database setup (not yet deployed)
+## Vercel preview
 
-The SQL migration in `sql/001_foundation.sql` creates four RLS-protected tables and a narrowly granted function `ah_run_in_app_notice`. Apply **only to a dedicated Automation Hub Supabase project**, after review, and run `sql/002_rls_smoke.sql` in a safe development environment. Do not apply to existing unrelated databases. This initial product supports one owner per workspace; inviting team members is NOT implemented.
+Set Root Directory to `apps/automation-hub-web`. Configure `NEXT_PUBLIC_SUPABASE_URL` and `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` in the intended Vercel environments. As of 2026-11-17, these are set only in **Preview** on project `automation-hub-web`, and code deploys are manually initiated from the feature branch (Vercel reports no linked Git repository when branch-scoping environment variables).
 
-### In-app workflow behavior
+## Features and limitations
 
-After signup: create a workspace, save a notification automation, click **Run now**, and the server-side database function atomically records one successful run and a notification event. The function validates the authenticated account's ownership, rejects paused automation and uses an idempotency key. This workflow does not call any external providers or n8n.
-
-### Operational gates
-
-- Never assume SQL files are already applied; run RLS behavioral tests with TWO real test users and negative access checks before production.
-- Browser sign-up, live workflow and UI build have NOT been verified against a live Supabase instance.
-- CI uses temporary `npm install` because this branch has no generated lockfile. Generate and commit a lockfile from a trustworthy dependency resolution, then change CI to `npm ci` before a production release.
-- No Vercel project is configured or verified here. Use Vercel Root Directory `apps/automation-hub-web` only after provisioning a dedicated Supabase project.
-- For production automation dispatch, add rate limiting, quotas, monitoring, job queues and tests. This synchronous internal notification MVP is not a general-purpose worker.
+- Implemented in code: marketing landing page, email/password login/signup, Supabase SSR session cookies and protected dashboard, owner workspace creation, notification automation, run history and private in-app event feed.
+- The in-app runner validates owner access, paused state, and idempotency. No external provider messages are sent.
+- Not implemented: email/WhatsApp/Telegram/Facebook integration, n8n worker, billing, plan subscriptions, team invitations, job queues, rate limiting, quotas, production monitoring and a production-grade automation dispatch service.
+- n8n source must be used according to its license. Do not resell a hosted/white-label n8n product without the appropriate licensing review.
+- Generate and commit the application's npm lockfile, switch its CI job from `npm install` to `npm ci`, and review dependency advisories before production.
+- Keep PR #2 in draft; do **not** merge until Auth, RLS, billing/licensing (where relevant), and end-to-end checks pass.
