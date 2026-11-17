@@ -1,0 +1,22 @@
+name: Automation Hub Web
+on:
+  pull_request:
+    paths:
+      - 'apps/automation-hub-web/**'
+      - '.github/workflows/automation-hub-web.yml'
+  workflow_dispatch:
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: apps/automation-hub-web
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      # npm install is temporary until a verified package-lock is committed.
+      - run: npm install --no-audit --no-fund
+      - run: npm run typecheck
+      - run: npm run build
