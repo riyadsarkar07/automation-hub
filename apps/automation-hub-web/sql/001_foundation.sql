@@ -110,8 +110,8 @@ grant execute on function automation_hub_private.ah_run_in_app_notice_internal(u
 
 -- Only this invoker-rights wrapper is callable through the public Data API.
 create or replace function public.ah_run_in_app_notice(p_automation_id uuid, p_idempotency_key uuid)
-returns uuid language sql security invoker set search_path = '' as $
+returns uuid language sql security invoker set search_path = '' as $$
   select automation_hub_private.ah_run_in_app_notice_internal(p_automation_id, p_idempotency_key);
-$;
+$$;
 revoke all on function public.ah_run_in_app_notice(uuid,uuid) from public, anon;
 grant execute on function public.ah_run_in_app_notice(uuid,uuid) to authenticated;
