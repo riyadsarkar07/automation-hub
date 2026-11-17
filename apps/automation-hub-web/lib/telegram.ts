@@ -40,6 +40,19 @@ export async function sendTelegramMessage(chatId: number, text: string): Promise
   }
 }
 
+
+export async function reserveTelegramSend(organizationId: string): Promise<number | null> {
+  const admin = telegramAdmin();
+  const threshold = new Date(Date.now() - 60_000).toISOString();
+  const { data, error } = await admin.from('automation_hub_telegram_links')
+    .update({ last_sent_at: new Date().toISOString() })
+    .eq('organization_id', organizationId)
+    .or('last_sent_at.is.null,last_sent_at.lt.' + threshold)
+    .select('chat_id').maybeSingle();
+  if (error) throw new Error('Could not reserve Telegram delivery');
+  return data ? Number(data.chat_id) : null;
+}
+
 export function isSameOrigin(request: Request): boolean {
   const origin = request.headers.get('origin');
   return Boolean(origin && origin === new URL(request.url).origin);
