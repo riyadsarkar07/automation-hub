@@ -6,7 +6,8 @@ declare missing int;
 begin
   select count(*) into missing
   from (values ('automation_hub_organizations'), ('automation_instances'),
-               ('automation_runs'), ('automation_hub_events')) as required(name)
+               ('automation_runs'), ('automation_hub_events'),
+               ('automation_hub_integrations')) as required(name)
   left join pg_namespace n on n.nspname = 'public'
   left join pg_class c on c.relnamespace = n.oid
                        and c.relname = required.name and c.relkind in ('r', 'p')
@@ -23,7 +24,11 @@ begin
     or has_table_privilege('anon','public.automation_instances','SELECT')
     or has_table_privilege('anon','public.automation_hub_organizations','SELECT')
     or has_table_privilege('anon','public.automation_runs','SELECT')
-    or has_table_privilege('anon','public.automation_hub_events','SELECT') then
+    or has_table_privilege('anon','public.automation_hub_events','SELECT')
+    or has_table_privilege('anon','public.automation_hub_integrations','SELECT')
+    or has_table_privilege('authenticated','public.automation_hub_integrations','DELETE')
+    or has_column_privilege('authenticated','public.automation_hub_integrations','organization_id','UPDATE')
+    then
     raise exception 'Unsafe Data API table/column grants detected';
   end if;
 
@@ -59,3 +64,7 @@ end $$;
 --    one run plus one notification event; a paused automation cannot run.
 -- 6) Check Database API exposed schemas exclude automation_hub_private.
 -- 7) Run Supabase security advisors and inspect grants/policies before launch.
+
+-- In-app integration test: only workspace owners can read, insert or toggle settings.
+-- The notification runner must reject new runs when in_app_enabled = false.
+-- Verify that a different JWT identity cannot read or change another workspace's row.
