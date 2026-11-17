@@ -1,7 +1,7 @@
 'use client';
 import { useState, type FormEvent } from 'react';
 import { useRouter } from 'next/navigation';
-import { browserClient } from '@/lib/supabase';
+import { browserClient } from '@/lib/supabase/browser';
 type Props = { userId: string; orgId?: string; automations: Array<{id:string;name:string;status:string}> };
 export function WorkspaceActions({userId,orgId,automations}: Props) {
   const router=useRouter(),[busy,setBusy]=useState(false),[error,setError]=useState(''),[notice,setNotice]=useState('');
