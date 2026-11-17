@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { serverClient } from '@/lib/supabase/server';
-import { isSameOrigin, sendTelegramMessage, telegramAdmin, telegramConfigured } from '@/lib/telegram';
+import { isSameOrigin, reserveTelegramSend, sendTelegramMessage, telegramConfigured } from '@/lib/telegram';
 
 export const runtime = 'nodejs';
 
@@ -18,18 +18,13 @@ export async function POST(request: Request) {
     .select('chat_id').eq('organization_id', org.id).maybeSingle();
   if (linkError || !link) return NextResponse.json({ error: 'Connect your Telegram chat first' }, { status: 409 });
 
-  // Server-only atomic cooldown prevents abusive repeated test messages.
-  const admin = telegramAdmin();
-  const threshold = new Date(Date.now() - 60_000).toISOString();
-  const { data: reserved, error: reserveError } = await admin.from('automation_hub_telegram_links')
-    .update({ last_test_at: new Date().toISOString() })
-    .eq('organization_id', org.id)
-    .or('last_test_at.is.null,last_test_at.lt.' + threshold)
-    .select('chat_id').maybeSingle();
-  if (reserveError) return NextResponse.json({ error: 'Unable to reserve test message' }, { status: 500 });
-  if (!reserved) return NextResponse.json({ error: 'Wait a minute before testing again' }, { status: 429 });
+  // One shared cooldown applies to tests and normal automation events.
+  let reservedChat: number | null;
+  try { reservedChat = await reserveTelegramSend(org.id); }
+  catch { return NextResponse.json({ error: 'Unable to reserve test message' }, { status: 500 }); }
+  if (!reservedChat) return NextResponse.json({ error: 'Wait a minute before testing again' }, { status: 429 });
   try {
-    await sendTelegramMessage(Number(reserved.chat_id), '✅ Automation Hub test notification. Your Telegram integration is connected.');
+    await sendTelegramMessage(reservedChat, '✅ Automation Hub test notification. Your Telegram integration is connected.');
     return NextResponse.json({ ok: true }, { headers: { 'Cache-Control': 'no-store' } });
   } catch {
     return NextResponse.json({ error: 'Telegram delivery failed. Check your bot and chat settings.' }, { status: 502 });
