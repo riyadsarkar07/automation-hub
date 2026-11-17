@@ -21,3 +21,19 @@ Set **Root Directory** to `apps/automation-hub-web` and add the same public envi
 - Do not treat an authenticated session as authorization to access another tenant's data. Ensure RLS policies are verified before activating the table.
 - Do not provide n8n as an unlicensed hosted or white-label service.
 - Install dependencies and commit the generated lockfile before production deployment. Package versions are preliminary, not validated by a local build in this PR.
+
+## Owner-scoped database setup (not yet deployed)
+
+The SQL migration in `sql/001_foundation.sql` creates four RLS-protected tables and a narrowly granted function `ah_run_in_app_notice`. Apply **only to a dedicated Automation Hub Supabase project**, after review, and run `sql/002_rls_smoke.sql` in a safe development environment. Do not apply to existing unrelated databases. This initial product supports one owner per workspace; inviting team members is NOT implemented.
+
+### In-app workflow behavior
+
+After signup: create a workspace, save a notification automation, click **Run now**, and the server-side database function atomically records one successful run and a notification event. The function validates the authenticated account's ownership, rejects paused automation and uses an idempotency key. This workflow does not call any external providers or n8n.
+
+### Operational gates
+
+- Never assume SQL files are already applied; run RLS behavioral tests with TWO real test users and negative access checks before production.
+- Browser sign-up, live workflow and UI build have NOT been verified against a live Supabase instance.
+- CI uses temporary `npm install` because this branch has no generated lockfile. Generate and commit a lockfile from a trustworthy dependency resolution, then change CI to `npm ci` before a production release.
+- No Vercel project is configured or verified here. Use Vercel Root Directory `apps/automation-hub-web` only after provisioning a dedicated Supabase project.
+- For production automation dispatch, add rate limiting, quotas, monitoring, job queues and tests. This synchronous internal notification MVP is not a general-purpose worker.
