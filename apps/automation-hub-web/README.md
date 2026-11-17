@@ -35,9 +35,17 @@ The internal notification MVP does **not** host or embed n8n and is **not** a ge
 
 Set Root Directory to `apps/automation-hub-web`. Configure `NEXT_PUBLIC_SUPABASE_URL` and `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` in the intended Vercel environments. As of 2026-11-17, these are set only in **Preview** on project `automation-hub-web`, and code deploys are manually initiated from the feature branch (Vercel reports no linked Git repository when branch-scoping environment variables).
 
+## Integrations workspace (2026-11-17)
+
+- `/dashboard/integrations` is a protected workspace page with functional in-app notification enable/disable and an optional real test run when an active automation exists.
+- `sql/004_in_app_integration_settings.sql` adds an owner-only RLS table for the workspace toggle. A restricted private-schema trigger blocks new notification runs while the channel is disabled. If no row exists, the previous default behavior remains enabled.
+- Tenant-isolation checks passed under two **simulated** authenticated identities using a transaction that rolled back all test data; real multi-user browser tests are still necessary.
+- Email, Telegram, WhatsApp and Facebook are **not connected**; the catalog displays the credential/approval requirements and accepts no secrets or tokens.
+- Latest advisor scan also reported **Leaked Password Protection Disabled** in Supabase Auth. Enable password leak protection before a public launch: https://supabase.com/docs/guides/auth/password-security#password-strength-and-leaked-password-protection
+
 ## Features and limitations
 
-- Implemented in code: marketing landing page, email/password login/signup, Supabase SSR session cookies and protected dashboard, owner workspace creation, notification automation, run history and private in-app event feed.
+- Implemented in code: marketing landing page, email/password login/signup, Supabase SSR session cookies and protected dashboard, owner workspace creation, notification automation, run history, private in-app event feed and a functional Integrations workspace page.
 - The in-app runner validates owner access, paused state, and idempotency. No external provider messages are sent.
 - Not implemented: email/WhatsApp/Telegram/Facebook integration, n8n worker, billing, plan subscriptions, team invitations, job queues, rate limiting, quotas, production monitoring and a production-grade automation dispatch service.
 - n8n source must be used according to its license. Do not resell a hosted/white-label n8n product without the appropriate licensing review.
