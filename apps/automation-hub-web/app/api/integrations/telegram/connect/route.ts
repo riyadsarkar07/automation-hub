@@ -20,9 +20,12 @@ export async function POST(request: Request) {
   const code = randomBytes(24).toString('base64url'); // 32 chars, 192 bits of entropy.
   const code_hash = createHash('sha256').update(code).digest('hex');
   const expires_at = new Date(Date.now() + 10 * 60 * 1000).toISOString();
+  // Rotate the workspace's single-use request without granting UPDATE on identity columns.
+  const { error: deleteError } = await client.from('automation_hub_telegram_link_requests')
+    .delete().eq('organization_id', org.id);
+  if (deleteError) return NextResponse.json({ error: 'Unable to rotate connect link' }, { status: 500 });
   const { error } = await client.from('automation_hub_telegram_link_requests')
-    .upsert({ organization_id: org.id, code_hash, expires_at, created_at: new Date().toISOString() },
-      { onConflict: 'organization_id' });
+    .insert({ organization_id: org.id, code_hash, expires_at });
   if (error) return NextResponse.json({ error: 'Unable to issue one-time link' }, { status: 500 });
 
   return NextResponse.json(
