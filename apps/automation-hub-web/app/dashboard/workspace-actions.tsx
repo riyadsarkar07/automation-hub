@@ -9,7 +9,17 @@ export function WorkspaceActions({userId,orgId,automations}: Props) {
   async function execute(task:()=>Promise<void>) {setBusy(true);setError('');setNotice('');try{await task();router.refresh();}catch(e){setError(e instanceof Error?e.message:'Something went wrong.');}finally{setBusy(false);}}
   function createOrg(e:FormEvent) {e.preventDefault();void execute(async()=>{const {error}=await browserClient().from('automation_hub_organizations').insert({name:orgName.trim(),owner_user_id:userId});if(error)throw error;setNotice('Workspace created.');});}
   function createAutomation(e:FormEvent) {e.preventDefault();if(!orgId)return;void execute(async()=>{const {error}=await browserClient().from('automation_instances').insert({organization_id:orgId,name:name.trim(),message:message.trim(),kind:'in_app_notice',status:'active'});if(error)throw error;setNotice('Automation saved.');});}
-  function run(id:string) {void execute(async()=>{const {error}=await browserClient().rpc('ah_run_in_app_notice',{p_automation_id:id,p_idempotency_key:crypto.randomUUID()});if(error)throw error;setNotice('In-app notification delivered to your activity feed.');});}
+  function run(id:string) {void execute(async()=>{
+    const response=await fetch('/api/automations/run',{
+      method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({automation_id:id}),cache:'no-store'
+    });
+    const result=await response.json() as {error?:string;telegram?:string};
+    if(!response.ok)throw new Error(result.error||'Automation could not run.');
+    const delivery=result.telegram==='delivered'?' Telegram notification sent.':
+      result.telegram==='rate_limited'?' Telegram message skipped (one per minute limit).':
+      result.telegram==='delivery_failed'?' Telegram delivery failed; in-app event saved.':'';
+    setNotice('In-app notification created.'+delivery);
+  });}
   return <section className="action-card">
     <h2>{orgId?'Create a notification automation':'Create your workspace'}</h2>
     {orgId?<><p className="muted">This MVP workflow writes a real notification to your private activity feed. It does not send external messages.</p>
